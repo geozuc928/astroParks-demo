@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AstroParks — Sign Up</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="card">
+    <div class="card-header">
+      <div class="logo">AstroParks</div>
+      <div class="subtitle">Customer Sign Up</div>
+    </div>
+
+    <form id="signupForm">
+      <div>
+        <label for="username">Name</label>
+        <input
+          id="username"
+          name="username"
+          type="text"
+          required
+          placeholder="Parker1"
+          autocomplete="name"
+        />
+      </div>
+
+      <div>
+        <label for="email">Email Address</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          required
+          placeholder="Parker1@astroparks.io"
+          autocomplete="email"
+        />
+      </div>
+
+      <div>
+        <label for="license_plate">Vehicle License Plate</label>
+        <input
+          id="license_plate"
+          name="license_plate"
+          type="text"
+          required
+          placeholder="ABC123"
+          autocomplete="off"
+        />
+      </div>
+
+      <button type="submit" class="btn-primary" id="submitBtn">Sign Up</button>
+      <p class="error-msg" id="errorMsg"></p>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('signupForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const errorMsg = document.getElementById('errorMsg');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorMsg.textContent = '';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Signing up…';
+
+      const payload = {
+        username: document.getElementById('username').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        license_plate: document.getElementById('license_plate').value.trim(),
+      };
+
+      try {
+        const res = await fetch('/api/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.status === 201) {
+          window.location.href = '/rules.html';
+          return;
+        }
+
+        const data = await res.json();
+        errorMsg.textContent =
+          res.status === 409
+            ? 'That email address is already registered.'
+            : res.status === 400
+            ? 'Please fill in all fields.'
+            : data.error || 'Something went wrong. Please try again.';
+      } catch {
+        errorMsg.textContent = 'Network error. Please check your connection.';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Sign Up';
+      }
+    });
+  </script>
+</body>
+</html>

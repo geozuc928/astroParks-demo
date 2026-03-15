@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AstroParks — Parking Rules</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="card">
+    <div class="card-header">
+      <div class="logo">AstroParks</div>
+      <div class="subtitle">Parking Rules &amp; Rates</div>
+    </div>
+
+    <div class="rules-grid" id="rulesGrid">
+      <p class="loading">Loading rules…</p>
+    </div>
+
+    <a href="/signup.html" class="btn-secondary">Back to Sign Up</a>
+  </div>
+
+  <script>
+    async function loadRules() {
+      const grid = document.getElementById('rulesGrid');
+      try {
+        const res = await fetch('/api/rules');
+        if (!res.ok) throw new Error('Failed to load rules.');
+        const data = await res.json();
+
+        grid.innerHTML = `
+          <div class="rule-item">
+            <span class="rule-label">Rate</span>
+            <span class="rule-value" id="rateDisplay">${data.rate_display}</span>
+          </div>
+          <div class="rule-item">
+            <span class="rule-label">Maximum Duration</span>
+            <span class="rule-value" id="maxDisplay">${data.max_display}</span>
+          </div>
+        `;
+      } catch (err) {
+        grid.innerHTML = `<p class="error-msg">Could not load parking rules. Please try again.</p>`;
+      }
+    }
+
+    loadRules();
+  </script>
+</body>
+</html>
