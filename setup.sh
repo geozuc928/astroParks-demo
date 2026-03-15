@@ -36,24 +36,9 @@ if ! command -v npm &>/dev/null; then
 fi
 ok "npm v$(npm --version)"
 
-# ─── 3. Check PostgreSQL client (psql) ───────────────────────────────────────
-info "Checking PostgreSQL client (psql)..."
-if ! command -v psql &>/dev/null; then
-  warn "psql not found. Install the PostgreSQL client:"
-  warn "  Ubuntu/Debian : sudo apt install postgresql-client"
-  warn "  macOS         : brew install libpq && brew link --force libpq"
-  warn "  Or install full PostgreSQL from https://www.postgresql.org/download/"
-  echo ""
-  warn "Skipping database initialisation — run 'npm run db:init' manually once psql is available."
-  SKIP_DB=1
-else
-  ok "psql $(psql --version | awk '{print $3}')"
-  SKIP_DB=0
-fi
-
-# ─── 4. Install Node dependencies ────────────────────────────────────────────
+# ─── 3. Install Node dependencies ────────────────────────────────────────────
 info "Installing Node.js dependencies..."
-REQUIRED_PACKAGES=("express" "pg")
+REQUIRED_PACKAGES=("express" "pg" "dotenv")
 MISSING=()
 for pkg in "${REQUIRED_PACKAGES[@]}"; do
   if [ ! -d "node_modules/$pkg" ]; then
@@ -68,11 +53,11 @@ else
   info "All packages already installed — running npm install to verify..."
   npm install --prefer-offline 2>&1 | tail -1
 fi
-ok "node_modules ready (express, pg)"
+ok "node_modules ready (express, pg, dotenv)"
 
-# ─── 5. Verify critical files are in place ───────────────────────────────────
+# ─── 4. Verify critical files are in place ───────────────────────────────────
 info "Verifying project files..."
-FILES=("server.js" "db/index.js" "db/init.sql" "public/signup.html" "public/rules.html" "public/style.css")
+FILES=("server.js" "db/index.js" "db/init.sql" "db/run-init.js" "public/signup.html" "public/rules.html" "public/style.css")
 for f in "${FILES[@]}"; do
   if [ ! -f "$f" ]; then
     fail "Missing file: $f — please re-clone or restore the repository."
@@ -80,44 +65,36 @@ for f in "${FILES[@]}"; do
 done
 ok "All project files present"
 
-# ─── 6. Resolve DATABASE_URL ─────────────────────────────────────────────────
-if [ -z "$DATABASE_URL" ]; then
-  warn "DATABASE_URL is not set."
+# ─── 5. Check .env file ───────────────────────────────────────────────────────
+info "Checking .env file..."
+if [ ! -f ".env" ]; then
+  warn ".env file not found — creating from .env.example..."
+  cp .env.example .env
+  warn "Edit .env and set your DATABASE_URL, then re-run this script."
   echo ""
-  echo "  Set it before running this script, for example:"
-  echo "    export DATABASE_URL=postgres://USER:PASSWORD@localhost:5432/astroparks"
-  echo "    bash setup.sh"
+  echo "  nano .env   (Linux/macOS)"
+  echo "  notepad .env  (Windows)"
   echo ""
-  echo "  Or supply it inline:"
-  echo "    DATABASE_URL=postgres://... bash setup.sh"
-  echo ""
-  read -r -p "  Enter DATABASE_URL now (or press Enter to skip DB init): " INPUT_URL
-  if [ -n "$INPUT_URL" ]; then
-    export DATABASE_URL="$INPUT_URL"
-  else
-    warn "Skipping database initialisation. Run 'npm run db:init' manually."
-    SKIP_DB=1
-  fi
+  exit 0
+fi
+ok ".env file found"
+
+# ─── 6. Initialise the database ──────────────────────────────────────────────
+info "Initialising database (npm run db:init)..."
+if npm run db:init; then
+  ok "Database tables created and parking rules seeded"
+else
+  fail "Database initialisation failed. Check DATABASE_URL in your .env file."
 fi
 
-# ─── 7. Initialise the database ──────────────────────────────────────────────
-if [ "${SKIP_DB:-0}" -eq 0 ]; then
-  info "Initialising database..."
-  if psql "$DATABASE_URL" -f db/init.sql; then
-    ok "Database tables created and parking rules seeded"
-  else
-    fail "Database initialisation failed. Check your DATABASE_URL and PostgreSQL connection."
-  fi
-fi
-
-# ─── 8. Done — launch server ─────────────────────────────────────────────────
+# ─── 7. Done ─────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════╗"
 echo -e "║         Setup complete!              ║"
 echo -e "╚══════════════════════════════════════╝${NC}"
 echo ""
 echo "  Start the server:"
-echo -e "    ${CYAN}DATABASE_URL=<your-url> npm start${NC}"
+echo -e "    ${CYAN}npm start${NC}"
 echo ""
 echo "  Then open: http://localhost:3000"
 echo ""

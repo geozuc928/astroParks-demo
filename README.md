@@ -20,7 +20,43 @@ A two-page parking app demo built with Node.js, Express, and PostgreSQL.
 | [Node.js](https://nodejs.org) | v16+ | JavaScript runtime |
 | [npm](https://www.npmjs.com) | v7+ | Bundled with Node.js |
 | [PostgreSQL](https://www.postgresql.org/download/) | v13+ | Database server |
-| psql | any | CLI client (ships with PostgreSQL) |
+
+> **No need to install psql separately.** Database initialisation now runs through Node.js directly.
+
+---
+
+## Configuration
+
+All environment variables are stored in a `.env` file in the project root. **You only need to edit this once.**
+
+### 1. Copy the example file
+
+```bash
+# macOS / Linux
+cp .env.example .env
+
+# Windows (Command Prompt)
+copy .env.example .env
+
+# Windows (PowerShell)
+Copy-Item .env.example .env
+```
+
+### 2. Edit `.env` with your PostgreSQL credentials
+
+```env
+DATABASE_URL=postgres://YOUR_USER:YOUR_PASSWORD@localhost:5432/astroparks
+PORT=3000
+```
+
+Replace `YOUR_USER` and `YOUR_PASSWORD` with your PostgreSQL username and password.
+The default PostgreSQL superuser is usually `postgres`.
+
+**Example:**
+```env
+DATABASE_URL=postgres://postgres:mypassword@localhost:5432/astroparks
+PORT=3000
+```
 
 ---
 
@@ -33,86 +69,48 @@ git clone <repo-url>
 cd astroParks-demo
 ```
 
-### 2. Run the setup script
+### 2. Configure `.env`
 
-The setup script checks all prerequisites, installs dependencies, and initialises the database.
+Follow the [Configuration](#configuration) steps above.
+
+### 3. Run the setup script (macOS / Linux)
 
 ```bash
-DATABASE_URL=postgres://USER:PASSWORD@localhost:5432/astroparks bash setup.sh
+bash setup.sh
 ```
 
-> The script will prompt for `DATABASE_URL` if it is not set.
-
-### 3. Start the server
+### 3. Manual setup (Windows or step-by-step)
 
 ```bash
-DATABASE_URL=postgres://USER:PASSWORD@localhost:5432/astroparks npm start
+# Install dependencies
+npm install
+
+# Create the PostgreSQL database (run once)
+psql -U postgres -c "CREATE DATABASE astroparks;"
+
+# Initialise tables and seed parking rules
+npm run db:init
+
+# Start the server
+npm start
 ```
 
 Open **http://localhost:3000** in your browser.
 
 ---
 
-## Manual Setup (step by step)
+## Running on Windows (PowerShell)
 
-If you prefer to run each step individually:
+All commands work directly in PowerShell — no special prefix needed because credentials are read from `.env`:
 
-### Install Node.js dependencies
-
-```bash
+```powershell
+# Install dependencies
 npm install
-```
 
-This installs:
-- `express` — web framework / HTTP server
-- `pg` — PostgreSQL client for Node.js
+# Initialise the database
+npm run db:init
 
-Packages are installed into `node_modules/` in the project root.
-
-### Create the PostgreSQL database
-
-```bash
-createdb astroparks
-# or using psql:
-psql -U postgres -c "CREATE DATABASE astroparks;"
-```
-
-### Initialise tables and seed data
-
-```bash
-DATABASE_URL=postgres://USER:PASSWORD@localhost:5432/astroparks npm run db:init
-```
-
-This runs `db/init.sql`, which:
-- Creates the `customers` table
-- Creates the `parking_rules` table
-- Seeds the parking rule: **$1.00/hr**, max **4 hrs**
-
-Safe to re-run — the seed insert is guarded with `WHERE NOT EXISTS`.
-
-### Start the server
-
-```bash
-DATABASE_URL=postgres://USER:PASSWORD@localhost:5432/astroparks npm start
-```
-
----
-
-## Environment Variables
-
-| Variable | Required | Example | Description |
-|----------|----------|---------|-------------|
-| `DATABASE_URL` | Yes | `postgres://user:pass@localhost:5432/astroparks` | PostgreSQL connection string |
-| `PORT` | No | `3000` | Server port (defaults to 3000) |
-
-Alternatively, you can use individual `PG*` variables that the `pg` library reads automatically:
-
-```bash
-export PGHOST=localhost
-export PGPORT=5432
-export PGDATABASE=astroparks
-export PGUSER=myuser
-export PGPASSWORD=mypassword
+# Start the server
 npm start
 ```
 
@@ -122,17 +120,29 @@ npm start
 
 ```
 astroParks-demo/
+├── .env                 # Your local config (gitignored — never committed)
+├── .env.example         # Safe template — copy to .env and fill in values
 ├── server.js            # Express server — API endpoints + static file serving
 ├── package.json         # Project metadata and npm scripts
-├── setup.sh             # One-command setup and validation script
+├── setup.sh             # One-command setup script (macOS/Linux)
 ├── db/
-│   ├── index.js         # PostgreSQL connection pool (exported singleton)
-│   └── init.sql         # Schema DDL + seed data — run once before starting
+│   ├── index.js         # PostgreSQL connection pool (reads from .env)
+│   ├── init.sql         # Schema DDL + seed data
+│   └── run-init.js      # Cross-platform DB init runner (used by npm run db:init)
 └── public/              # Static frontend — served directly by Express
     ├── signup.html      # Page 1: Customer sign-up form
     ├── rules.html       # Page 2: Parking rules display
     └── style.css        # Shared stylesheet
 ```
+
+---
+
+## npm Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm start` | Start the web server |
+| `npm run db:init` | Create tables and seed parking rules (run once) |
 
 ---
 
@@ -209,12 +219,3 @@ CREATE TABLE customers (
 | License Plate | ABC123 |
 | Rate | $1.00/hr |
 | Max Duration | 4 hrs |
-
----
-
-## npm Scripts
-
-| Script | Command | Description |
-|--------|---------|-------------|
-| `npm start` | `node server.js` | Start the server |
-| `npm run db:init` | `psql $DATABASE_URL -f db/init.sql` | Create tables and seed rules |
