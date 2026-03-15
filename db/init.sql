@@ -19,9 +19,9 @@ ALTER TABLE parking_rules ADD COLUMN IF NOT EXISTS enforce_start TIME;
 ALTER TABLE parking_rules ADD COLUMN IF NOT EXISTS enforce_end   TIME;
 ALTER TABLE parking_rules ADD COLUMN IF NOT EXISTS note          TEXT;
 
--- Seed the single parking rule (idempotent)
-INSERT INTO parking_rules (rate_cents, max_hours)
-SELECT 100, 4
+-- Seed the default parking rule (idempotent)
+INSERT INTO parking_rules (rate_cents, max_hours, enforce_start, enforce_end, note)
+SELECT 100, 4, '08:00', '20:00', 'Monday – Saturday'
 WHERE NOT EXISTS (SELECT 1 FROM parking_rules);
 
 -- Space occupancy state
