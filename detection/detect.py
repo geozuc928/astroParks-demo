@@ -31,8 +31,8 @@ load_dotenv(dotenv_path=Path(__file__).parent / '.env')
 
 DETECTION_DIR = Path(__file__).parent
 ZONE_FILES = {
-    'east': DETECTION_DIR / 'parking_spaces_east.json',
-    'west': DETECTION_DIR / 'parking_spaces_west.json',
+    'east': DETECTION_DIR / 'parking_map_east.json',
+    'west': DETECTION_DIR / 'parking_map_west.json',
 }
 YOLO_MODEL  = 'yolov8n.pt'   # downloaded automatically on first run
 COCO_CAR_ID = 2               # COCO class index for 'car'

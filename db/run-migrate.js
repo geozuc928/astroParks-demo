@@ -19,13 +19,13 @@ const detectionDir = path.join(__dirname, '..', 'detection');
 
 // Map of zone name -> JSON file path
 const ZONE_FILES = {
-  east: path.join(detectionDir, 'parking_spaces_east.json'),
-  west: path.join(detectionDir, 'parking_spaces_west.json'),
+  east: path.join(detectionDir, 'parking_map_east.json'),
+  west: path.join(detectionDir, 'parking_map_west.json'),
 };
 
 for (const [zone, filePath] of Object.entries(ZONE_FILES)) {
   if (!fs.existsSync(filePath)) {
-    console.error(`[ERROR] detection/parking_spaces_${zone}.json not found.`);
+    console.error(`[ERROR] detection/parking_map_${zone}.json not found.`);
     console.error(`        Place your ${zone} parking spaces JSON file at ${filePath}`);
     process.exit(1);
   }
