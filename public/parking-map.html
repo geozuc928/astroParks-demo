@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AstroParks — Parking Map</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="card-wide">
+    <div class="card-header">
+      <div class="logo">AstroParks</div>
+      <div class="subtitle">Live Parking Occupancy — Garage Camera</div>
+    </div>
+
+    <div class="summary-bar" id="summaryBar">
+      <span class="summary-chip total">Loading…</span>
+    </div>
+
+    <div class="map-timestamp" id="timestamp"></div>
+
+    <div class="map-container" id="mapContainer">
+      <p class="loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)">
+        Loading map…
+      </p>
+    </div>
+
+    <div class="map-actions">
+      <button class="btn-primary" id="refreshBtn" onclick="loadSpaces()">Refresh</button>
+    </div>
+
+    <a href="/signup.html" class="btn-secondary">Back to Sign Up</a>
+  </div>
+
+  <script>
+    // Image dimensions from parking_spaces.json imageInfo
+    const IMG_W = 2560;
+    const IMG_H = 719;
+
+    let refreshTimer = null;
+
+    function bbox(polygonPixels) {
+      // Compute bounding box from polygon points [{x,y}, ...]
+      const xs = polygonPixels.map(p => p.x);
+      const ys = polygonPixels.map(p => p.y);
+      return {
+        x1: Math.min(...xs),
+        y1: Math.min(...ys),
+        x2: Math.max(...xs),
+        y2: Math.max(...ys),
+      };
+    }
+
+    function renderSpaceMap(spaces) {
+      const container = document.getElementById('mapContainer');
+      container.innerHTML = '';
+
+      for (const space of spaces) {
+        const poly = space.polygon_pixels;
+        if (!poly || !poly.length) continue;
+
+        const b = bbox(poly);
+        const left   = (b.x1 / IMG_W * 100).toFixed(3);
+        const top    = (b.y1 / IMG_H * 100).toFixed(3);
+        const width  = ((b.x2 - b.x1) / IMG_W * 100).toFixed(3);
+        const height = ((b.y2 - b.y1) / IMG_H * 100).toFixed(3);
+
+        const cls = space.is_occupied ? 'occupied' : 'available';
+        const title = space.is_occupied
+          ? `Space ${space.space_label} — OCCUPIED (conf ${(space.confidence * 100).toFixed(0)}%)`
+          : `Space ${space.space_label} — Available`;
+
+        const div = document.createElement('div');
+        div.className = `space-polygon ${cls}`;
+        div.title = title;
+        div.style.left   = `${left}%`;
+        div.style.top    = `${top}%`;
+        div.style.width  = `${width}%`;
+        div.style.height = `${height}%`;
+        div.textContent  = space.space_label;
+        container.appendChild(div);
+      }
+    }
+
+    function updateSummary(data) {
+      const bar = document.getElementById('summaryBar');
+      bar.innerHTML = `
+        <span class="summary-chip occupied">${data.occupied_count} Occupied</span>
+        <span class="summary-chip available">${data.available_count} Available</span>
+        <span class="summary-chip total">${data.total_spaces} Total</span>
+      `;
+    }
+
+    function updateTimestamp(last_run_at) {
+      const el = document.getElementById('timestamp');
+      if (!last_run_at) {
+        el.textContent = 'No detection run yet.';
+        return;
+      }
+      const d = new Date(last_run_at);
+      el.textContent = `Last detection: ${d.toLocaleString()}`;
+    }
+
+    async function loadSpaces() {
+      const btn = document.getElementById('refreshBtn');
+      btn.disabled = true;
+      btn.textContent = 'Refreshing…';
+      try {
+        const res = await fetch('/api/spaces');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        updateSummary(data);
+        renderSpaceMap(data.spaces);
+        updateTimestamp(data.last_run_at);
+      } catch (err) {
+        document.getElementById('summaryBar').innerHTML =
+          `<span class="summary-chip total" style="color:var(--color-error)">Failed to load — ${err.message}</span>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Refresh';
+      }
+    }
+
+    // Auto-refresh every 10 seconds
+    loadSpaces();
+    refreshTimer = setInterval(loadSpaces, 10000);
+  </script>
+</body>
+</html>

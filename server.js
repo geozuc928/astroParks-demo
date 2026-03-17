@@ -61,6 +61,103 @@ app.get('/api/rules', async (req, res) => {
   }
 });
 
+// POST /api/detections — accept detection results from Python detector
+app.post('/api/detections', async (req, res) => {
+  const { image_source, detected_at, spaces } = req.body || {};
+
+  if (!Array.isArray(spaces) || spaces.length === 0) {
+    return res.status(400).json({ error: 'spaces must be a non-empty array.' });
+  }
+
+  try {
+    // Look up all referenced space labels in one query
+    const labels = [...new Set(spaces.map(s => s.space_label))];
+    const labelRows = await pool.query(
+      `SELECT id, space_label FROM parking_spaces WHERE space_label = ANY($1)`,
+      [labels]
+    );
+    const labelToId = {};
+    for (const row of labelRows.rows) labelToId[row.space_label] = row.id;
+
+    // Build bulk insert
+    const values = [];
+    const params = [];
+    let idx = 1;
+    for (const s of spaces) {
+      const spaceId = labelToId[s.space_label];
+      if (!spaceId) continue; // skip unknown labels
+      values.push(`($${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++})`);
+      params.push(
+        spaceId,
+        image_source || null,
+        detected_at || null,
+        s.is_occupied === true,
+        s.confidence != null ? s.confidence : null,
+        s.car_bbox_x1 != null ? s.car_bbox_x1 : null,
+        s.car_bbox_y1 != null ? s.car_bbox_y1 : null,
+        s.car_bbox_x2 != null ? s.car_bbox_x2 : null,
+        s.car_bbox_y2 != null ? s.car_bbox_y2 : null
+      );
+    }
+
+    if (values.length === 0) {
+      return res.status(400).json({ error: 'No recognised space labels in payload.' });
+    }
+
+    await pool.query(
+      `INSERT INTO parking_detections
+       (space_id, image_source, detected_at, is_occupied,
+        confidence, car_bbox_x1, car_bbox_y1, car_bbox_x2, car_bbox_y2)
+       VALUES ${values.join(',')}`,
+      params
+    );
+
+    return res.status(201).json({ inserted: values.length });
+  } catch (err) {
+    console.error('Detections error:', err);
+    return res.status(500).json({ error: 'Server error. Please try again.' });
+  }
+});
+
+// GET /api/spaces — return current occupancy state for all parking spaces
+app.get('/api/spaces', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT ps.space_label, ps.polygon_pixels,
+              COALESCE(d.is_occupied, FALSE) AS is_occupied,
+              d.confidence,
+              d.detected_at AS last_detected_at
+       FROM parking_spaces ps
+       LEFT JOIN LATERAL (
+         SELECT is_occupied, confidence, detected_at
+         FROM parking_detections
+         WHERE space_id = ps.id
+         ORDER BY detected_at DESC
+         LIMIT 1
+       ) d ON TRUE
+       ORDER BY ps.space_label`
+    );
+
+    const spaces = result.rows;
+    const occupied_count = spaces.filter(s => s.is_occupied).length;
+    const timestamps = spaces.map(s => s.last_detected_at).filter(Boolean);
+    const last_run_at = timestamps.length
+      ? timestamps.reduce((a, b) => (a > b ? a : b))
+      : null;
+
+    return res.json({
+      spaces,
+      total_spaces: spaces.length,
+      occupied_count,
+      available_count: spaces.length - occupied_count,
+      last_run_at,
+    });
+  } catch (err) {
+    console.error('Spaces error:', err);
+    return res.status(500).json({ error: 'Server error. Please try again.' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`AstroParks server running at http://localhost:${PORT}`);
 });
