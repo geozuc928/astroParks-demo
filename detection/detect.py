@@ -3,14 +3,16 @@
 AstroParks YOLO v8 parking space detector.
 
 Identifies vehicles in a camera image, maps each detected car to a numbered
-parking space using polygon coordinates from parking_spaces.json, and persists
-the results to PostgreSQL or posts them to the Node.js API.
+parking space using polygon coordinates from a zone-specific JSON file, and
+persists the results to PostgreSQL or posts them to the Node.js API.
 
 Usage:
-    python detect.py --image /path/to/frame.jpg
-    python detect.py --image /path/to/frame.jpg --write-db
-    python detect.py --image /path/to/frame.jpg --post-url http://localhost:3000
-    python detect.py --image /path/to/frame.jpg --annotate out.jpg
+    python detect.py --zone east --image /path/to/frame.jpg
+    python detect.py --zone west --image /path/to/frame.jpg --write-db
+    python detect.py --zone east --image /path/to/frame.jpg --post-url http://localhost:3000
+    python detect.py --zone west --image /path/to/frame.jpg --annotate out.jpg
+    # Override spaces file explicitly:
+    python detect.py --spaces /path/to/custom.json --image frame.jpg
 """
 import argparse
 import json
@@ -27,7 +29,11 @@ from ultralytics import YOLO
 # Load .env from the detection/ directory (keeps DB creds separate from Node .env)
 load_dotenv(dotenv_path=Path(__file__).parent / '.env')
 
-SPACES_JSON = Path(__file__).parent / 'parking_spaces.json'
+DETECTION_DIR = Path(__file__).parent
+ZONE_FILES = {
+    'east': DETECTION_DIR / 'parking_spaces_east.json',
+    'west': DETECTION_DIR / 'parking_spaces_west.json',
+}
 YOLO_MODEL  = 'yolov8n.pt'   # downloaded automatically on first run
 COCO_CAR_ID = 2               # COCO class index for 'car'
 CONF_THRESH  = 0.35           # minimum YOLO confidence to consider a detection
@@ -179,7 +185,8 @@ def post_to_api(results: list, image_source: str, detected_at: str, api_url: str
           file=sys.stderr)
 
 
-def write_to_db(results: list, image_source: str, detected_at: str, db_url: str) -> None:
+def write_to_db(results: list, image_source: str, detected_at: str,
+                db_url: str, zone: str) -> None:
     """Write detection results directly to PostgreSQL via psycopg2."""
     import psycopg2  # imported here to keep startup fast when not used
 
@@ -189,12 +196,12 @@ def write_to_db(results: list, image_source: str, detected_at: str, db_url: str)
             with conn.cursor() as cur:
                 for row in results:
                     cur.execute(
-                        'SELECT id FROM parking_spaces WHERE space_label = %s LIMIT 1',
-                        (row['space_label'],)
+                        'SELECT id FROM parking_spaces WHERE space_label = %s AND zone = %s LIMIT 1',
+                        (row['space_label'], zone)
                     )
                     rec = cur.fetchone()
                     if not rec:
-                        print(f'[WARN]  Space label "{row["space_label"]}" not found in DB, skipping.',
+                        print(f'[WARN]  Space label "{row["space_label"]}" zone "{zone}" not found in DB, skipping.',
                               file=sys.stderr)
                         continue
                     space_id = rec[0]
@@ -254,8 +261,10 @@ def annotate_image(image_path: str, spaces: list, detections: list,
 def main() -> None:
     parser = argparse.ArgumentParser(description='AstroParks YOLO v8 parking detector')
     parser.add_argument('--image',    required=True, help='Path to input camera frame')
-    parser.add_argument('--spaces',   default=str(SPACES_JSON),
-                        help='Path to parking_spaces.json (default: detection/parking_spaces.json)')
+    parser.add_argument('--zone',     choices=['east', 'west'], default=None,
+                        help='Camera zone: east or west. Sets --spaces automatically.')
+    parser.add_argument('--spaces',   default=None,
+                        help='Explicit path to parking spaces JSON (overrides --zone)')
     parser.add_argument('--model',    default=YOLO_MODEL,
                         help='YOLOv8 model weights (default: yolov8n.pt)')
     parser.add_argument('--write-db', action='store_true',
@@ -270,9 +279,20 @@ def main() -> None:
         print(f'[ERROR] Image not found: {args.image}', file=sys.stderr)
         sys.exit(1)
 
+    # Resolve spaces JSON path: explicit --spaces > --zone > error
+    if args.spaces:
+        spaces_path = Path(args.spaces)
+    elif args.zone:
+        spaces_path = ZONE_FILES[args.zone]
+    else:
+        print('[ERROR] Provide --zone east|west or --spaces /path/to/file.json', file=sys.stderr)
+        sys.exit(1)
+
+    zone = args.zone or 'default'
+
     # Load space definitions
     try:
-        spaces = load_spaces(Path(args.spaces))
+        spaces = load_spaces(spaces_path)
     except Exception as e:
         print(f'[ERROR] Failed to load spaces JSON: {e}', file=sys.stderr)
         sys.exit(1)
@@ -292,6 +312,7 @@ def main() -> None:
     output = {
         'image_source': args.image,
         'detected_at': detected_at,
+        'zone': zone,
         'total_cars_detected': len(detections),
         'occupied_spaces': occupied_count,
         'spaces': assignment_results,
@@ -318,7 +339,7 @@ def main() -> None:
             print('[ERROR] DATABASE_URL not set. Add it to detection/.env', file=sys.stderr)
             sys.exit(1)
         try:
-            write_to_db(assignment_results, args.image, detected_at, db_url)
+            write_to_db(assignment_results, args.image, detected_at, db_url, zone)
         except Exception as e:
             print(f'[ERROR] Failed to write to DB: {e}', file=sys.stderr)
             sys.exit(1)

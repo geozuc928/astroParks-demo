@@ -6,9 +6,20 @@ CREATE TABLE IF NOT EXISTS parking_spaces (
   space_key      VARCHAR(50)  NOT NULL UNIQUE,  -- JSON "id" field e.g. "sp_177..."
   space_label    VARCHAR(20)  NOT NULL,          -- "278", "275", etc.
   space_type     VARCHAR(20)  DEFAULT 'standard',
+  zone           VARCHAR(20)  NOT NULL DEFAULT 'default',  -- 'east' | 'west'
   polygon_pixels JSONB        NOT NULL,          -- [{x,y},{x,y},{x,y},{x,y}]
   created_at     TIMESTAMPTZ  DEFAULT NOW()
 );
+
+-- Add zone column to existing tables (idempotent)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'parking_spaces' AND column_name = 'zone'
+  ) THEN
+    ALTER TABLE parking_spaces ADD COLUMN zone VARCHAR(20) NOT NULL DEFAULT 'default';
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS parking_detections (
   id           SERIAL  PRIMARY KEY,

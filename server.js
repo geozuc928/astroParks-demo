@@ -120,10 +120,20 @@ app.post('/api/detections', async (req, res) => {
 });
 
 // GET /api/spaces — return current occupancy state for all parking spaces
+// Optional query param: ?zone=east|west  (omit for all zones)
 app.get('/api/spaces', async (req, res) => {
+  const { zone } = req.query;
+  const validZones = ['east', 'west'];
+  if (zone && !validZones.includes(zone)) {
+    return res.status(400).json({ error: `zone must be one of: ${validZones.join(', ')}` });
+  }
+
   try {
+    const params = zone ? [zone] : [];
+    const whereClause = zone ? 'WHERE ps.zone = $1' : '';
+
     const result = await pool.query(
-      `SELECT ps.space_label, ps.polygon_pixels,
+      `SELECT ps.space_label, ps.zone, ps.polygon_pixels,
               COALESCE(d.is_occupied, FALSE) AS is_occupied,
               d.confidence,
               d.detected_at AS last_detected_at
@@ -135,7 +145,9 @@ app.get('/api/spaces', async (req, res) => {
          ORDER BY detected_at DESC
          LIMIT 1
        ) d ON TRUE
-       ORDER BY ps.space_label`
+       ${whereClause}
+       ORDER BY ps.zone, ps.space_label`,
+      params
     );
 
     const spaces = result.rows;
@@ -146,6 +158,7 @@ app.get('/api/spaces', async (req, res) => {
       : null;
 
     return res.json({
+      zone: zone || 'all',
       spaces,
       total_spaces: spaces.length,
       occupied_count,
