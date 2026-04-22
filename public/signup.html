@@ -10,22 +10,10 @@
   <div class="card">
     <div class="card-header">
       <div class="logo">AstroParks</div>
-      <div class="subtitle">Customer Sign Up</div>
+      <div class="subtitle">Create Your Account</div>
     </div>
 
     <form id="signupForm">
-      <div>
-        <label for="username">Name</label>
-        <input
-          id="username"
-          name="username"
-          type="text"
-          required
-          placeholder="Parker1"
-          autocomplete="name"
-        />
-      </div>
-
       <div>
         <label for="email">Email Address</label>
         <input
@@ -33,8 +21,32 @@
           name="email"
           type="email"
           required
-          placeholder="Parker1@astroparks.io"
+          placeholder="parker@example.com"
           autocomplete="email"
+        />
+      </div>
+
+      <div>
+        <label for="password">Password</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          required
+          placeholder="At least 8 characters"
+          autocomplete="new-password"
+        />
+      </div>
+
+      <div>
+        <label for="confirm_password">Confirm Password</label>
+        <input
+          id="confirm_password"
+          name="confirm_password"
+          type="password"
+          required
+          placeholder="Re-enter your password"
+          autocomplete="new-password"
         />
       </div>
 
@@ -45,14 +57,16 @@
           name="license_plate"
           type="text"
           required
-          placeholder="ABC123"
+          placeholder="ABC 123"
           autocomplete="off"
         />
       </div>
 
-      <button type="submit" class="btn-primary" id="submitBtn">Sign Up</button>
+      <button type="submit" class="btn-primary" id="submitBtn">Create Account</button>
       <p class="error-msg" id="errorMsg"></p>
     </form>
+
+    <p class="auth-link">Already have an account? <a href="/login.html">Sign in</a></p>
   </div>
 
   <script>
@@ -63,39 +77,47 @@
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorMsg.textContent = '';
+
+      const password = document.getElementById('password').value;
+      const confirm = document.getElementById('confirm_password').value;
+
+      if (password !== confirm) {
+        errorMsg.textContent = 'Passwords do not match.';
+        return;
+      }
+      if (password.length < 8) {
+        errorMsg.textContent = 'Password must be at least 8 characters.';
+        return;
+      }
+
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Signing up…';
+      submitBtn.textContent = 'Creating account…';
 
       const payload = {
-        username: document.getElementById('username').value.trim(),
         email: document.getElementById('email').value.trim(),
+        password,
         license_plate: document.getElementById('license_plate').value.trim(),
       };
 
       try {
-        const res = await fetch('/api/signup', {
+        const res = await fetch('/api/auth/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
 
         if (res.status === 201) {
-          window.location.href = '/rules.html';
+          window.location.href = '/login.html';
           return;
         }
 
         const data = await res.json();
-        errorMsg.textContent =
-          res.status === 409
-            ? 'That email address is already registered.'
-            : res.status === 400
-            ? 'Please fill in all fields.'
-            : data.error || 'Something went wrong. Please try again.';
+        errorMsg.textContent = data.error || 'Something went wrong. Please try again.';
       } catch {
         errorMsg.textContent = 'Network error. Please check your connection.';
       } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Sign Up';
+        submitBtn.textContent = 'Create Account';
       }
     });
   </script>

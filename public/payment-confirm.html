@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AstroParks — Payment Confirmed</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="card">
+    <div class="card-header">
+      <div class="logo">AstroParks</div>
+    </div>
+
+    <!-- Loading state -->
+    <div id="loadingState">
+      <p class="loading" style="text-align:center">Confirming your payment…</p>
+    </div>
+
+    <!-- Success state -->
+    <div id="successState" style="display:none">
+      <div class="success-icon">&#10003;</div>
+      <h2 class="confirm-title">Payment Confirmed!</h2>
+      <p class="muted-text" style="text-align:center;margin-bottom:1.25rem">
+        Your parking session has been paid. Thank you for using AstroParks.
+      </p>
+
+      <div class="session-info">
+        <div class="confirm-detail">
+          <span class="detail-label">License Plate</span>
+          <span class="detail-value" id="confPlate">—</span>
+        </div>
+        <div class="confirm-detail">
+          <span class="detail-label">Entered At</span>
+          <span class="detail-value" id="confEntered">—</span>
+        </div>
+        <div class="confirm-detail">
+          <span class="detail-label">Paid At</span>
+          <span class="detail-value" id="confPaidAt">—</span>
+        </div>
+        <div class="confirm-detail" style="border-bottom:none">
+          <span class="detail-label">Amount Paid</span>
+          <span class="detail-value" id="confAmount" style="font-size:1.15rem;font-weight:700;color:var(--color-primary)">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error state -->
+    <div id="errorState" style="display:none">
+      <p class="error-msg" style="text-align:center" id="errorText">Could not confirm payment.</p>
+    </div>
+
+    <div style="margin-top:1.5rem; display:flex; flex-direction:column; gap:0.6rem">
+      <a href="/rules.html" class="btn-primary" style="text-align:center;text-decoration:none">Back to Parking</a>
+      <a href="/admin.html" class="btn-secondary">Admin — Vehicle Status</a>
+    </div>
+  </div>
+
+  <script>
+    async function verifyPayment() {
+      const params = new URLSearchParams(window.location.search);
+      const sessionId = params.get('session_id');
+
+      if (!sessionId) {
+        showError('No payment session found. Please contact support.');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/payments/verify?session_id=${encodeURIComponent(sessionId)}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          showError(data.error || 'Payment could not be verified.');
+          return;
+        }
+
+        document.getElementById('confPlate').textContent = data.license_plate;
+        document.getElementById('confEntered').textContent =
+          new Date(data.entered_at).toLocaleString();
+        document.getElementById('confPaidAt').textContent =
+          data.paid_at ? new Date(data.paid_at).toLocaleString() : '—';
+        document.getElementById('confAmount').textContent =
+          data.amount_cents ? `$${(data.amount_cents / 100).toFixed(2)}` : '—';
+
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('successState').style.display = 'block';
+      } catch {
+        showError('Network error. Please contact support.');
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('errorText').textContent = msg;
+      document.getElementById('errorState').style.display = 'block';
+    }
+
+    verifyPayment();
+  </script>
+</body>
+</html>

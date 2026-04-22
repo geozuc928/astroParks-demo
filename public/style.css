@@ -28,6 +28,12 @@ body {
   padding: 1rem;
 }
 
+/* Admin body allows wider layout and top-aligned content */
+body.admin-body {
+  align-items: flex-start;
+  padding: 2rem 1rem;
+}
+
 .card {
   background: var(--color-card);
   border-radius: var(--radius);
@@ -35,6 +41,15 @@ body {
   padding: 2.5rem 2rem;
   width: 100%;
   max-width: 440px;
+}
+
+.admin-card {
+  background: var(--color-card);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+  width: 100%;
+  max-width: 860px;
 }
 
 /* Header */
@@ -72,7 +87,8 @@ label {
 }
 
 input[type="text"],
-input[type="email"] {
+input[type="email"],
+input[type="password"] {
   display: block;
   width: 100%;
   padding: 0.65rem 0.85rem;
@@ -85,7 +101,8 @@ input[type="email"] {
 }
 
 input[type="text"]:focus,
-input[type="email"]:focus {
+input[type="email"]:focus,
+input[type="password"]:focus {
   border-color: var(--color-accent);
 }
 
@@ -125,7 +142,7 @@ input[type="email"]:focus {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 
 .rule-item {
@@ -161,6 +178,8 @@ input[type="email"]:focus {
   border: 1.5px solid var(--color-primary);
   border-radius: 6px;
   text-decoration: none;
+  background: transparent;
+  cursor: pointer;
   transition: background 0.2s, color 0.2s;
 }
 
@@ -173,4 +192,159 @@ input[type="email"]:focus {
   color: var(--color-muted);
   font-size: 0.95rem;
   text-align: center;
+}
+
+/* Auth link below forms */
+.auth-link {
+  text-align: center;
+  margin-top: 1.25rem;
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+.auth-link a {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth-link a:hover {
+  text-decoration: underline;
+}
+
+/* Divider */
+.divider {
+  border: none;
+  border-top: 1px solid #e0e8f0;
+  margin: 1.5rem 0;
+}
+
+/* Section label */
+.section-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-muted);
+  margin-bottom: 0.75rem;
+}
+
+.muted-text {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+.success-text {
+  font-size: 0.95rem;
+  color: var(--color-success);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Session / confirmation detail rows */
+.session-info {
+  border: 1px solid #e0e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.confirm-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid #e0e8f0;
+}
+
+.confirm-detail:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.detail-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* Payment confirmation */
+.success-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #d4edda;
+  color: var(--color-success);
+  font-size: 1.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+}
+
+.confirm-title {
+  text-align: center;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 0.5rem;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.badge-green {
+  background: #d4edda;
+  color: #155724;
+}
+
+.badge-red {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.badge-yellow {
+  background: #fff3cd;
+  color: #856404;
+}
+
+/* Admin table */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.admin-table th {
+  background: var(--color-primary);
+  color: #fff;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admin-table td {
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid #e0e8f0;
+  vertical-align: middle;
+}
+
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-table tr:nth-child(even) td {
+  background: #f7f9fc;
 }

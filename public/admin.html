@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AstroParks — Admin</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body class="admin-body">
+  <div class="admin-card">
+    <div class="card-header">
+      <div class="logo">AstroParks</div>
+      <div class="subtitle">Master Vehicle Status</div>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem">
+      <div>
+        <span class="badge badge-green">In Lot</span>
+        <span class="badge badge-red" style="margin-left:0.5rem">Not in Lot</span>
+        <span class="badge badge-yellow" style="margin-left:0.5rem">Unpaid</span>
+      </div>
+      <button class="btn-secondary" id="refreshBtn" style="width:auto;padding:0.4rem 1rem;font-size:0.85rem">Refresh</button>
+    </div>
+
+    <div id="tableContainer">
+      <p class="loading">Loading vehicle data…</p>
+    </div>
+
+    <div style="margin-top:1.5rem">
+      <a href="/rules.html" class="btn-secondary">Back to Parking</a>
+    </div>
+  </div>
+
+  <script>
+    async function loadVehicles() {
+      const container = document.getElementById('tableContainer');
+      container.innerHTML = '<p class="loading">Loading vehicle data…</p>';
+      try {
+        const res = await fetch('/api/admin/vehicles');
+        const vehicles = await res.json();
+
+        if (!res.ok) {
+          container.innerHTML = `<p class="error-msg">${vehicles.error || 'Failed to load data.'}</p>`;
+          return;
+        }
+
+        if (vehicles.length === 0) {
+          container.innerHTML = '<p class="muted-text" style="text-align:center;padding:1.5rem 0">No parking sessions recorded yet.</p>';
+          return;
+        }
+
+        const rows = vehicles.map(v => {
+          const inLotBadge = v.in_lot
+            ? '<span class="badge badge-green">In Lot</span>'
+            : '<span class="badge badge-red">Gone</span>';
+          const paidBadge = v.paid
+            ? '<span class="badge badge-green">Paid</span>'
+            : '<span class="badge badge-yellow">Unpaid</span>';
+          const entered = new Date(v.entered_at).toLocaleString();
+          const amount = v.amount_cents ? `$${(v.amount_cents / 100).toFixed(2)}` : '—';
+
+          return `
+            <tr>
+              <td><strong>${escHtml(v.license_plate)}</strong></td>
+              <td>${escHtml(v.email)}</td>
+              <td>${inLotBadge}</td>
+              <td>${paidBadge}</td>
+              <td style="white-space:nowrap">${entered}</td>
+              <td>${amount}</td>
+            </tr>
+          `;
+        }).join('');
+
+        container.innerHTML = `
+          <div style="overflow-x:auto">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Plate</th>
+                  <th>Email</th>
+                  <th>In Lot</th>
+                  <th>Paid</th>
+                  <th>Entered At</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+          <p class="muted-text" style="font-size:0.8rem;margin-top:0.75rem;text-align:right">
+            ${vehicles.length} session${vehicles.length !== 1 ? 's' : ''} total
+          </p>
+        `;
+      } catch {
+        container.innerHTML = '<p class="error-msg">Network error. Please try again.</p>';
+      }
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', loadVehicles);
+
+    loadVehicles();
+  </script>
+</body>
+</html>

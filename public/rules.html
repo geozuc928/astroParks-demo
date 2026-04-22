@@ -3,47 +3,195 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AstroParks — Parking Rules</title>
+  <title>AstroParks — Parking</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <div class="card">
+  <div class="card" style="max-width:480px">
     <div class="card-header">
       <div class="logo">AstroParks</div>
-      <div class="subtitle">Parking Rules &amp; Rates</div>
+      <div class="subtitle" id="welcomeMsg">Parking Rules &amp; Rates</div>
     </div>
 
+    <!-- Rules section -->
     <div class="rules-grid" id="rulesGrid">
       <p class="loading">Loading rules…</p>
     </div>
 
-    <a href="/signup.html" class="btn-secondary">Back to Sign Up</a>
+    <!-- Session section -->
+    <div id="sessionSection" style="display:none">
+      <hr class="divider" />
+
+      <!-- No active session -->
+      <div id="noSession">
+        <p class="section-label">Your Parking Session</p>
+        <p class="muted-text">You are not currently checked in. Start a session when you enter the lot.</p>
+        <button class="btn-primary" id="startBtn" style="margin-top:1rem">Start Parking Session</button>
+        <p class="error-msg" id="startError"></p>
+      </div>
+
+      <!-- Active session -->
+      <div id="activeSession" style="display:none">
+        <p class="section-label">Active Parking Session</p>
+        <div class="session-info">
+          <div class="confirm-detail">
+            <span class="detail-label">License Plate</span>
+            <span class="detail-value" id="sessionPlate">—</span>
+          </div>
+          <div class="confirm-detail">
+            <span class="detail-label">Entered At</span>
+            <span class="detail-value" id="sessionEntered">—</span>
+          </div>
+          <div class="confirm-detail">
+            <span class="detail-label">Status</span>
+            <span class="detail-value" id="sessionStatus">—</span>
+          </div>
+        </div>
+
+        <div id="payNowSection" style="margin-top:1.25rem">
+          <button class="btn-primary" id="payBtn">Pay Now</button>
+          <p class="error-msg" id="payError"></p>
+        </div>
+
+        <div id="alreadyPaid" style="display:none; margin-top:1rem">
+          <p class="success-text">Session paid. Thank you for parking with AstroParks!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer links -->
+    <div style="margin-top:1.5rem; display:flex; flex-direction:column; gap:0.6rem">
+      <a href="/admin.html" class="btn-secondary">Admin — Vehicle Status</a>
+      <button class="btn-secondary" id="logoutBtn">Sign Out</button>
+    </div>
   </div>
 
   <script>
+    let rateCents = 0;
+
+    async function checkAuth() {
+      const res = await fetch('/api/auth/me');
+      if (!res.ok) {
+        window.location.href = '/login.html';
+        return null;
+      }
+      return res.json();
+    }
+
     async function loadRules() {
       const grid = document.getElementById('rulesGrid');
       try {
         const res = await fetch('/api/rules');
-        if (!res.ok) throw new Error('Failed to load rules.');
+        if (!res.ok) throw new Error();
         const data = await res.json();
-
+        rateCents = data.rate_cents;
         grid.innerHTML = `
           <div class="rule-item">
             <span class="rule-label">Rate</span>
-            <span class="rule-value" id="rateDisplay">${data.rate_display}</span>
+            <span class="rule-value">${data.rate_display}</span>
           </div>
           <div class="rule-item">
             <span class="rule-label">Maximum Duration</span>
-            <span class="rule-value" id="maxDisplay">${data.max_display}</span>
+            <span class="rule-value">${data.max_display}</span>
           </div>
         `;
-      } catch (err) {
-        grid.innerHTML = `<p class="error-msg">Could not load parking rules. Please try again.</p>`;
+      } catch {
+        grid.innerHTML = '<p class="error-msg">Could not load parking rules.</p>';
       }
     }
 
-    loadRules();
+    async function loadSession() {
+      const res = await fetch('/api/sessions/active');
+      if (!res.ok) return null;
+      return res.json();
+    }
+
+    function renderSession(session) {
+      document.getElementById('sessionSection').style.display = 'block';
+      if (!session) {
+        document.getElementById('noSession').style.display = 'block';
+        document.getElementById('activeSession').style.display = 'none';
+        return;
+      }
+      document.getElementById('noSession').style.display = 'none';
+      document.getElementById('activeSession').style.display = 'block';
+      document.getElementById('sessionPlate').textContent = session.license_plate;
+      document.getElementById('sessionEntered').textContent =
+        new Date(session.entered_at).toLocaleString();
+
+      if (session.paid) {
+        document.getElementById('sessionStatus').innerHTML = '<span class="badge badge-green">Paid</span>';
+        document.getElementById('payNowSection').style.display = 'none';
+        document.getElementById('alreadyPaid').style.display = 'block';
+      } else {
+        document.getElementById('sessionStatus').innerHTML = '<span class="badge badge-yellow">Unpaid</span>';
+        document.getElementById('payNowSection').style.display = 'block';
+        document.getElementById('alreadyPaid').style.display = 'none';
+      }
+    }
+
+    async function init() {
+      const user = await checkAuth();
+      if (!user) return;
+      document.getElementById('welcomeMsg').textContent =
+        `Welcome, ${user.license_plate}`;
+
+      await loadRules();
+      const session = await loadSession();
+      renderSession(session);
+    }
+
+    document.getElementById('startBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('startBtn');
+      const err = document.getElementById('startError');
+      err.textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Starting…';
+      try {
+        const res = await fetch('/api/sessions/start', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) {
+          err.textContent = data.error || 'Failed to start session.';
+          return;
+        }
+        renderSession(data);
+      } catch {
+        err.textContent = 'Network error. Please try again.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Start Parking Session';
+      }
+    });
+
+    document.getElementById('payBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('payBtn');
+      const err = document.getElementById('payError');
+      err.textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Redirecting to payment…';
+      try {
+        const res = await fetch('/api/payments/checkout', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) {
+          err.textContent = data.error || 'Failed to start payment.';
+          btn.disabled = false;
+          btn.textContent = 'Pay Now';
+          return;
+        }
+        window.location.href = data.url;
+      } catch {
+        err.textContent = 'Network error. Please try again.';
+        btn.disabled = false;
+        btn.textContent = 'Pay Now';
+      }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    });
+
+    init();
   </script>
 </body>
 </html>
