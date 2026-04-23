@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "db:init": "node db/run-init.js"
+    "db:init": "node db/run-init.js",
+    "db:migrate": "node db/run-migrate.js"
   },
   "dependencies": {
     "dotenv": "^17.3.1",

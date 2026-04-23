@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AstroParks — Parking Map</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--color-bg);
+      margin-bottom: 1.25rem;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 0.6rem 1rem;
+      background: var(--color-bg);
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--color-muted);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      border-radius: 6px 6px 0 0;
+    }
+    .tab-btn.active {
+      background: var(--color-primary);
+      color: #fff;
+    }
+    .tab-btn:hover:not(.active) {
+      background: #dde4ec;
+      color: var(--color-primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="card-wide">
+    <div class="card-header">
+      <div class="logo">AstroParks</div>
+      <div class="subtitle">Live Parking Occupancy — Garage Camera</div>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab-east" onclick="switchZone('east')">East Lot</button>
+      <button class="tab-btn"        id="tab-west" onclick="switchZone('west')">West Lot</button>
+    </div>
+
+    <div class="summary-bar" id="summaryBar">
+      <span class="summary-chip total">Loading…</span>
+    </div>
+
+    <div class="map-timestamp" id="timestamp"></div>
+
+    <div class="map-container" id="mapContainer">
+      <p class="loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)">
+        Loading map…
+      </p>
+    </div>
+
+    <div class="map-actions">
+      <button class="btn-primary" id="refreshBtn" onclick="loadSpaces()">Refresh</button>
+    </div>
+
+    <a href="/signup.html" class="btn-secondary">Back to Sign Up</a>
+  </div>
+
+  <script>
+    // Image dimensions from parking_spaces JSON imageInfo (2560x719 for both cameras)
+    const IMG_W = 2560;
+    const IMG_H = 719;
+
+    let currentZone = 'east';
+    let refreshTimer = null;
+
+    function switchZone(zone) {
+      currentZone = zone;
+      document.getElementById('tab-east').classList.toggle('active', zone === 'east');
+      document.getElementById('tab-west').classList.toggle('active', zone === 'west');
+      loadSpaces();
+    }
+
+    function bbox(polygonPixels) {
+      const xs = polygonPixels.map(p => p.x);
+      const ys = polygonPixels.map(p => p.y);
+      return {
+        x1: Math.min(...xs), y1: Math.min(...ys),
+        x2: Math.max(...xs), y2: Math.max(...ys),
+      };
+    }
+
+    function renderSpaceMap(spaces) {
+      const container = document.getElementById('mapContainer');
+      container.innerHTML = '';
+
+      for (const space of spaces) {
+        const poly = space.polygon_pixels;
+        if (!poly || !poly.length) continue;
+
+        const b = bbox(poly);
+        const left   = (b.x1 / IMG_W * 100).toFixed(3);
+        const top    = (b.y1 / IMG_H * 100).toFixed(3);
+        const width  = ((b.x2 - b.x1) / IMG_W * 100).toFixed(3);
+        const height = ((b.y2 - b.y1) / IMG_H * 100).toFixed(3);
+
+        const cls = space.is_occupied ? 'occupied' : 'available';
+        const confPct = space.confidence != null
+          ? ` (conf ${(space.confidence * 100).toFixed(0)}%)`
+          : '';
+        const title = space.is_occupied
+          ? `Space ${space.space_label} — OCCUPIED${confPct}`
+          : `Space ${space.space_label} — Available`;
+
+        const div = document.createElement('div');
+        div.className = `space-polygon ${cls}`;
+        div.title = title;
+        div.style.left   = `${left}%`;
+        div.style.top    = `${top}%`;
+        div.style.width  = `${width}%`;
+        div.style.height = `${height}%`;
+        div.textContent  = space.space_label;
+        container.appendChild(div);
+      }
+    }
+
+    function updateSummary(data) {
+      const zoneName = currentZone.charAt(0).toUpperCase() + currentZone.slice(1);
+      document.getElementById('summaryBar').innerHTML = `
+        <span class="summary-chip occupied">${data.occupied_count} Occupied</span>
+        <span class="summary-chip available">${data.available_count} Available</span>
+        <span class="summary-chip total">${data.total_spaces} Total — ${zoneName} Lot</span>
+      `;
+    }
+
+    function updateTimestamp(last_run_at) {
+      const el = document.getElementById('timestamp');
+      if (!last_run_at) {
+        el.textContent = 'No detection run yet.';
+        return;
+      }
+      el.textContent = `Last detection: ${new Date(last_run_at).toLocaleString()}`;
+    }
+
+    async function loadSpaces() {
+      const btn = document.getElementById('refreshBtn');
+      btn.disabled = true;
+      btn.textContent = 'Refreshing…';
+      try {
+        const res = await fetch(`/api/spaces?zone=${currentZone}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        updateSummary(data);
+        renderSpaceMap(data.spaces);
+        updateTimestamp(data.last_run_at);
+      } catch (err) {
+        document.getElementById('summaryBar').innerHTML =
+          `<span class="summary-chip total" style="color:var(--color-error)">Failed to load — ${err.message}</span>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Refresh';
+      }
+    }
+
+    // Auto-refresh every 10 seconds
+    loadSpaces();
+    refreshTimer = setInterval(loadSpaces, 10000);
+  </script>
+</body>
+</html>
